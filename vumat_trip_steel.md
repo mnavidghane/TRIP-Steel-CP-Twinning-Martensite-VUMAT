@@ -52,9 +52,7 @@ The model belongs to the class of **mechanism-based crystal plasticity models wi
 
 The overall inelastic strain rate is conceptually decomposed as
 
-$$
-\dot{\varepsilon}^{\text{inel}}=\dot{\varepsilon}^{\text{slip}}+\dot{\varepsilon}^{\text{twin}}+\dot{\varepsilon}^{\text{tr}}
-$$
+$$ \Delta \varepsilon = \Delta \varepsilon^{e} + \Delta \varepsilon^{\text{slip}} + \Delta \varepsilon^{\text{twin}} + \Delta \varepsilon^{\text{tr,vol}} $$
 
 where
 
