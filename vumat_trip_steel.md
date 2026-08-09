@@ -36,12 +36,12 @@ The model is suitable for:
 |---|---|---|
 | Elastic response | Isotropic Hookean elasticity | Stress tensor |
 | Crystallographic slip | 12 FCC `{111}<110>` slip systems, rate-dependent power-law flow, Voce hardening | Slip shear strains, CRSS values |
-| Martensitic transformation | Olson–Cohen-type shear-band nucleation + JMAK-type strain-driven kinetics | Martensite volume fraction $f_M$ |
-| Transformation eigenstrain | Isotropic volumetric expansion proportional to $\Delta f_M$ | Accumulated transformation strain $\varepsilon_M$ |
-| Mechanical twinning | 12 FCC `{111}<112>` twin systems, polar CRSS activation, TANH kinetics | Twin volume fraction $f_{\text{tw}}$ |
+| Martensitic transformation | Olson–Cohen-type shear-band nucleation + JMAK-type strain-driven kinetics | Martensite volume fraction `f_M` |
+| Transformation eigenstrain | Isotropic volumetric expansion proportional to `Δf_M` | Accumulated transformation strain `eps_M` |
+| Mechanical twinning | 12 FCC `{111}<112>` twin systems, polar CRSS activation, TANH kinetics | Twin volume fraction `f_tw` |
 | Twin-induced plastic strain | Twin shear distributed over active twin systems | Twin plastic strain tensor |
-| Twin–martensite coupling | Additional martensite nucleation proportional to twin fraction increment | Coupling parameter $\alpha_{TM}$ |
-| Phase fraction constraint | $f_M + f_{\text{tw}} \leq 1$ enforced | $f_M$, $f_{\text{tw}}$ |
+| Twin–martensite coupling | Additional martensite nucleation proportional to twin fraction increment | Coupling parameter `alpha_TM` |
+| Phase fraction constraint | `f_M + f_tw <= 1` enforced | `f_M`, `f_tw` |
 | Numerical stabilization | Slip increment cap, volume-fraction rate caps, anti-overshoot limiter | Internal algorithmic variables |
 
 ---
@@ -52,46 +52,23 @@ The model belongs to the class of **mechanism-based crystal plasticity models wi
 
 The overall inelastic strain rate is conceptually decomposed as
 
-$$ \Delta \varepsilon = \Delta \varepsilon^{e} + \Delta \varepsilon^{\text{slip}} + \Delta \varepsilon^{\text{twin}} + \Delta \varepsilon^{\text{tr,vol}} $$
+ε̇_inel = ε̇_slip + ε̇_twin + ε̇_tr
 
 where
 
-- $\dot{\varepsilon}^{\text{slip}}$ is the plastic strain rate from dislocation glide,
-- $\dot{\varepsilon}^{\text{twin}}$ is the pseudo-plastic strain rate associated with mechanical twinning,
-- $\dot{\varepsilon}^{\text{tr}}$ is the transformation strain rate associated with martensite formation.
+- `ε̇_slip` is the plastic strain rate from dislocation glide,
+- `ε̇_twin` is the pseudo-plastic strain rate associated with mechanical twinning,
+- `ε̇_tr` is the transformation strain rate associated with martensite formation.
 
 In the current implementation, the strain increment passed by Abaqus is treated incrementally:
 
-$$
-\Delta \varepsilon
-=
-\Delta \varepsilon^{e}
-+
-\Delta \varepsilon^{\text{slip}}
-+
-\Delta \varepsilon^{\text{twin}}
-+
-\Delta \varepsilon^{\text{tr,vol}}
-$$
+Δε = Δε_e + Δε_slip + Δε_twin + Δε_tr,vol
 
 The stress update is then performed from the elastic part only:
 
-$$
-\Delta \sigma
-=
-\mathbf{D}^{e} :
-\left(
-\Delta \varepsilon
--
-\Delta \varepsilon^{\text{slip}}
--
-\Delta \varepsilon^{\text{twin}}
--
-\Delta \varepsilon^{\text{tr,vol}}
-\right)
-$$
+Δσ = D_e : ( Δε − Δε_slip − Δε_twin − Δε_tr,vol )
 
-where $\mathbf{D}^{e}$ is the isotropic elastic stiffness tensor.
+where `D_e` is the isotropic elastic stiffness tensor.
 
 ---
 
@@ -101,46 +78,29 @@ where $\mathbf{D}^{e}$ is the isotropic elastic stiffness tensor.
 
 A rigorous finite-strain description of TRIP/TWIP behavior often uses a multiplicative decomposition of the deformation gradient:
 
-$$
-\mathbf{F}
-=
-\mathbf{F}^{e}
-\mathbf{F}^{p}
-\mathbf{F}^{\text{tr}}
-\mathbf{F}^{\text{tw}}
-$$
+F = F_e · F_p · F_tr · F_tw
 
 where
 
-- $\mathbf{F}^{e}$ is the elastic lattice distortion,
-- $\mathbf{F}^{p}$ is the plastic deformation due to crystallographic slip,
-- $\mathbf{F}^{\text{tr}}$ is the transformation deformation due to martensite formation,
-- $\mathbf{F}^{\text{tw}}$ is the twinning deformation.
+- `F_e` is the elastic lattice distortion,
+- `F_p` is the plastic deformation due to crystallographic slip,
+- `F_tr` is the transformation deformation due to martensite formation,
+- `F_tw` is the twinning deformation.
 
 This decomposition is useful because it separates physically distinct mechanisms:
 
 | Component | Mechanism |
 |---|---|
-| $\mathbf{F}^{e}$ | Elastic stretching and lattice rotation |
-| $\mathbf{F}^{p}$ | Dislocation slip |
-| $\mathbf{F}^{\text{tr}}$ | Martensitic transformation strain |
-| $\mathbf{F}^{\text{tw}}$ | Twinning shear and reorientation |
+| `F_e` | Elastic stretching and lattice rotation |
+| `F_p` | Dislocation slip |
+| `F_tr` | Martensitic transformation strain |
+| `F_tw` | Twinning shear and reorientation |
 
 ### 4.2 Implemented incremental form
 
 The present VUMAT does not explicitly track all deformation gradients. Instead, it uses an **incremental strain decomposition** in the corotational frame supplied by Abaqus/Explicit:
 
-$$
-\Delta \varepsilon
-=
-\Delta \varepsilon^{e}
-+
-\Delta \varepsilon^{\text{cp}}
-+
-\Delta \varepsilon^{\text{tw}}
-+
-\Delta \varepsilon^{\text{tr,vol}}
-$$
+Δε = Δε_e + Δε_cp + Δε_tw + Δε_tr,vol
 
 This approach is computationally efficient and robust for explicit simulations. It is particularly appropriate when:
 
@@ -159,38 +119,28 @@ For problems requiring exact finite-strain hyperelastic consistency, strong elas
 
 The subroutine uses **isotropic linear elasticity**:
 
-$$
-\lambda = \frac{E \nu}{(1+\nu)(1-2\nu)}
-$$
-
-$$
-\mu = \frac{E}{2(1+\nu)}
-$$
-
-$$
-K = \lambda + \frac{2}{3}\mu
-$$
+λ = E·ν / [(1+ν)(1−2ν)]        (Lamé's first parameter)
+μ = E / [2(1+ν)]                (shear modulus)
+K = λ + (2/3)·μ                 (bulk modulus)
 
 The elastic stiffness matrix in Voigt notation is assembled as:
 
-$$
-\mathbf{D}^{e}
-=
-\begin{bmatrix}
-\lambda + 2\mu & \lambda & \lambda & 0 & 0 & 0 \\
-\lambda & \lambda + 2\mu & \lambda & 0 & 0 & 0 \\
-\lambda & \lambda & \lambda + 2\mu & 0 & 0 & 0 \\
-0 & 0 & 0 & 2\mu & 0 & 0 \\
-0 & 0 & 0 & 0 & 2\mu & 0 \\
-0 & 0 & 0 & 0 & 0 & 2\mu
-\end{bmatrix}
-$$
+    D_e =
+    [ λ+2μ  λ     λ     0   0   0 ]
+    [ λ     λ+2μ  λ     0   0   0 ]
+    [ λ     λ     λ+2μ  0   0   0 ]
+    [ 0     0     0     2μ  0   0 ]
+    [ 0     0     0     0   2μ  0 ]
+    [ 0     0     0     0   0   2μ ]
+
+Equivalently, in component form:
+
+σ_ii = λ·(εxx+εyy+εzz) + 2μ·εii
+σ_ij = 2μ·εij     (i ≠ j)
 
 The stress increment is
 
-$$
-\Delta \sigma = \mathbf{D}^{e} : \Delta \varepsilon^{e}
-$$
+Δσ = D_e : Δε_e
 
 ### 5.2 Elasticity model alternatives
 
@@ -199,7 +149,7 @@ $$
 | Isotropic Hooke | Simple, robust, only two parameters | Ignores crystal elastic anisotropy | Selected |
 | Saint Venant–Kirchhoff | Finite-strain compatible | Poor for large strains, not ideal for metals | Not selected |
 | Neo-Hookean hyperelastic | Thermodynamically consistent for finite elastic strains | Still isotropic, more complex | Possible extension |
-| Cubic anisotropic elasticity | Captures FCC elastic anisotropy | Requires $C_{11}, C_{12}, C_{44}$ | Future extension |
+| Cubic anisotropic elasticity | Captures FCC elastic anisotropy | Requires `C11, C12, C44` | Future extension |
 | Anisotropic hyperelasticity | General texture-dependent elasticity | Many parameters, calibration burden | Not selected |
 
 ### 5.3 Why isotropic elasticity was selected
@@ -228,7 +178,7 @@ Several macroscopic yield criteria could be used to describe plastic yielding in
 
 | Yield/plasticity model | Strengths | Weaknesses |
 |---|---|---|
-| von Mises $J_2$ | Simple, robust, isotropic | Cannot capture crystallographic texture or orientation effects |
+| von Mises `J2` | Simple, robust, isotropic | Cannot capture crystallographic texture or orientation effects |
 | Tresca | Simple shear-based criterion | Corners in yield surface, less accurate for FCC metals |
 | Drucker–Prager | Includes hydrostatic pressure sensitivity | Mainly for soils, concrete, porous materials |
 | Hill48 | Captures orthotropic sheet anisotropy | Empirical, no direct slip-system information |
@@ -239,9 +189,7 @@ Several macroscopic yield criteria could be used to describe plastic yielding in
 
 For TRIP steels, the physically dominant plastic mechanism in austenite is slip on FCC systems:
 
-$$
-\{111\}\langle 110 \rangle
-$$
+{111}⟨110⟩
 
 There are 12 such slip systems. Crystal plasticity is selected because it can represent:
 
@@ -263,118 +211,68 @@ In a crystal plasticity framework, the macroscopic yield surface is not imposed 
 
 The model uses the standard FCC slip family:
 
-$$
-\{111\}\langle 110 \rangle
-$$
+{111}⟨110⟩
 
 with 12 systems:
 
 | Plane family | Slip directions | Number of systems |
 |---|---|---:|
-| $(111)$ | $[0\bar{1}1]$, $[10\bar{1}]$, $[\bar{1}10]$ | 3 |
-| $(1\bar{1}1)$ | $[011]$, $[101]$, $[\bar{1}\bar{1}0]$ | 3 |
-| $(\bar{1}11)$ | $[01\bar{1}]$, $[101]$, $[\bar{1}10]$ | 3 |
-| $(11\bar{1})$ | $[011]$, $[10\bar{1}]$, $[\bar{1}\bar{1}0]$ | 3 |
+| (1 1 1) | [0 -1 1], [1 0 -1], [-1 1 0] | 3 |
+| (1 -1 1) | [0 1 1], [1 0 1], [-1 -1 0] | 3 |
+| (-1 1 1) | [0 1 -1], [1 0 1], [-1 1 0] | 3 |
+| (1 1 -1) | [0 1 1], [1 0 -1], [-1 -1 0] | 3 |
 
 The slip systems are hard-coded in the local material coordinate system. For polycrystalline simulations, grain orientation must be supplied through Abaqus `*ORIENTATION`.
 
 ### 7.2 Schmid tensor
 
-For each slip system $\alpha$, with slip direction $\mathbf{s}^{\alpha}$ and slip-plane normal $\mathbf{n}^{\alpha}$, the symmetric Schmid tensor is
+For each slip system `α`, with unit slip direction `s_α` and unit slip-plane normal `n_α` (with `n·s = 0`), the symmetric Schmid tensor is
 
-$$
-\mathbf{M}^{\alpha}
-=
-\frac{1}{2}
-\left(
-\mathbf{s}^{\alpha} \otimes \mathbf{n}^{\alpha}
-+
-\mathbf{n}^{\alpha} \otimes \mathbf{s}^{\alpha}
-\right)
-$$
+M_α = 1/2 · ( s_α ⊗ n_α + n_α ⊗ s_α )
 
 The resolved shear stress is
 
-$$
-\tau^{\alpha}
-=
-\mathbf{M}^{\alpha} : \boldsymbol{\sigma}
-$$
+τ_α = M_α : σ
 
 ### 7.3 Rate-dependent power-law flow rule
 
-The shear rate on slip system $\alpha$ is
+The shear rate on slip system `α` is
 
-$$
-\dot{\gamma}^{\alpha}
-=
-\dot{\gamma}_{0}
-\left|
-\frac{\tau^{\alpha}}{g^{\alpha}}
-\right|^{1/m}
-\operatorname{sign}(\tau^{\alpha})
-$$
+γ̇_α = γ̇_0 · ( |τ_α| / g_α )^(1/m) · sign(τ_α)
 
 where
 
-- $\dot{\gamma}_{0}$ is the reference shear strain rate,
-- $m$ is the rate-sensitivity exponent,
-- $g^{\alpha}$ is the current critical resolved shear stress, CRSS.
+- `γ̇_0` is the reference shear strain rate (`gam0`),
+- `m` is the rate-sensitivity exponent (`mexp`),
+- `g_α` is the current critical resolved shear stress, CRSS.
 
-The slip increment is
+Implemented in the code as:
 
-$$
-\Delta \gamma^{\alpha}
-=
-\dot{\gamma}^{\alpha} \Delta t
-$$
+gdot = gam0 * (|τ_α| / g_α)^(1/mexp) * sign(τ_α)
+dγ_α = gdot * dt
 
 ### 7.4 Plastic strain from slip
 
 The plastic strain increment due to slip is
 
-$$
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-=
-\sum_{\alpha=1}^{12}
-\mathbf{M}^{\alpha}
-\Delta \gamma^{\alpha}
-$$
+Δε_cp = Σ_α  M_α · Δγ_α        (α = 1 … 12)
 
 ### 7.5 Voce hardening law
 
 The CRSS of each slip system evolves according to a Voce-type saturation law:
 
-$$
-g^{\alpha}(\Gamma^{\alpha})
-=
-\tau_{0}
-+
-(\tau_{s} - \tau_{0})
-\left[
-1 -
-\exp\left(
--\frac{h_{0}\Gamma^{\alpha}}{\tau_{s} - \tau_{0}}
-\right)
-\right]
-$$
+g_α(Γ_α) = τ0 + (τs − τ0) · [ 1 − exp( −h0 · Γ_α / (τs − τ0) ) ]
 
 where
 
-- $\tau_{0}$ is the initial CRSS,
-- $\tau_{s}$ is the saturation CRSS,
-- $h_{0}$ is the initial hardening rate,
-- $\Gamma^{\alpha}$ is the accumulated absolute slip on system $\alpha$.
+- `τ0` is the initial CRSS,
+- `τs` is the saturation CRSS,
+- `h0` is the initial hardening rate,
+- `Γ_α = Σ |Δγ_α|` is the accumulated absolute slip on system `α`.
 
-If $\tau_{s} \leq \tau_{0}$, the model falls back to linear hardening:
+If `τs ≤ τ0`, the model falls back to linear hardening:
 
-$$
-g^{\alpha}
-=
-\tau_{0}
-+
-h_{0}\Gamma^{\alpha}
-$$
+g_α = τ0 + h0 · Γ_α
 
 ### 7.6 Hardening model alternatives
 
@@ -382,7 +280,7 @@ $$
 |---|---|---|---|
 | Linear hardening | Simple | No saturation | Fallback only |
 | Power-law hardening | Common for metals | Less natural saturation behavior | Not selected |
-| Voce hardening | Captures saturation typical of FCC metals | Requires $\tau_s, h_0$ | Selected |
+| Voce hardening | Captures saturation typical of FCC metals | Requires `τs, h0` | Selected |
 | Isotropic macroscopic hardening | Simple continuum model | No slip-system resolution | Not suitable for CP |
 | Kinematic hardening | Captures Bauschinger effect | More parameters, not system-based here | Not implemented |
 | Latent hardening matrix | Captures cross-system interaction | Requires latent hardening coefficients | Future extension |
@@ -391,21 +289,11 @@ $$
 
 The current implementation uses **self-hardening only**. The CRSS of each slip system evolves according to its own accumulated slip:
 
-$$
-\Gamma^{\alpha}
-=
-\sum |\Delta \gamma^{\alpha}|
-$$
+Γ_α = Σ |Δγ_α|
 
 A more advanced model would include a latent hardening matrix:
 
-$$
-\dot{g}^{\alpha}
-=
-\sum_{\beta}
-h^{\alpha\beta}
-|\dot{\gamma}^{\beta}|
-$$
+ġ_α = Σ_β  h_αβ · |γ̇_β|
 
 Latent hardening is often important for texture evolution and multislip behavior in FCC metals. It is a recommended extension.
 
@@ -438,19 +326,13 @@ Although the present VUMAT uses a robust strain-driven implementation, the physi
 
 The chemical free-energy difference between austenite and martensite can be written approximately as
 
-$$
-\Delta G_{\text{chem}}
-=
-\Delta H_{M}
--
-T \Delta S_{M}
-$$
+ΔG_chem = ΔH_M − T·ΔS_M
 
 where
 
-- $\Delta H_{M}$ is the enthalpy change,
-- $\Delta S_{M}$ is the entropy change,
-- $T$ is absolute temperature.
+- `ΔH_M` is the enthalpy change,
+- `ΔS_M` is the entropy change,
+- `T` is absolute temperature.
 
 Transformation becomes favorable when the total driving force exceeds a critical energy barrier.
 
@@ -458,57 +340,31 @@ Transformation becomes favorable when the total driving force exceeds a critical
 
 An applied stress state can assist transformation by performing mechanical work on the transformation strain:
 
-$$
-\Delta G_{\text{mech}}
-=
-\boldsymbol{\sigma} : \boldsymbol{\varepsilon}^{\text{tr}}
-$$
+ΔG_mech = σ : ε_tr
 
 Thus the total driving force may be written conceptually as
 
-$$
-\Delta G_{M}
-=
-\Delta G_{\text{chem}}
-+
-\Delta G_{\text{mech}}
-$$
+ΔG_M = ΔG_chem + ΔG_mech
 
 or, in a more explicit form,
 
-$$
-\Delta G_{M}
-=
-\Delta H_{M}
--
-T \Delta S_{M}
-+
-\boldsymbol{\sigma} : \boldsymbol{\varepsilon}^{\text{tr}}
-$$
+ΔG_M = ΔH_M − T·ΔS_M + σ : ε_tr
 
 ### 9.3 Critical barrier and Olson–Cohen-type condition
 
 In Olson–Cohen-type physical nucleation models, transformation starts when the driving force exceeds a critical barrier:
 
-$$
-\Delta G_{M} \geq G^{\text{crit}}_{M}
-$$
+ΔG_M ≥ G_crit_M
 
 A common simplified form is
 
-$$
-G^{\text{crit}}_{M}
-=
-G^{0}_{M}
--
-c \sigma^{2}
-$$
+G_crit_M = G0_M − c·σ^2
 
 where
 
-- $G^{0}_{M}$ is the stress-free barrier,
-- $c$ is a material constant,
-- $\sigma$ represents the applied stress intensity.
+- `G0_M` is the stress-free barrier,
+- `c` is a material constant,
+- `σ` represents the applied stress intensity.
 
 This expression captures the idea that mechanical loading lowers the nucleation barrier.
 
@@ -518,7 +374,7 @@ Two regimes are commonly distinguished:
 
 | Regime | Description |
 |---|---|
-| Stress-assisted transformation | Transformation is assisted by applied stress before large plastic strain; often important near or below $M_s$ |
+| Stress-assisted transformation | Transformation is assisted by applied stress before large plastic strain; often important near or below `Ms` |
 | Strain-induced transformation | Transformation is driven by plastic deformation, shear bands, and defect generation; dominant in many TRIP steels |
 
 The present VUMAT primarily captures the **strain-induced transformation regime** through accumulated plastic strain and shear-band-like nucleation variables.
@@ -534,19 +390,13 @@ Advanced transformation models may include the effect of:
 
 Stress triaxiality is often defined as
 
-$$
-\eta
-=
-\frac{\sigma_m}{\bar{\sigma}}
-$$
+η = σ_m / σ̄
 
 where
 
-$$
-\sigma_m = \frac{1}{3}\operatorname{tr}(\boldsymbol{\sigma})
-$$
+σ_m = (1/3)·tr(σ)
 
-and $\bar{\sigma}$ is the von Mises equivalent stress.
+and `σ̄` is the von Mises equivalent stress.
 
 High positive triaxiality generally promotes volumetric expansion associated with martensitic transformation, while shear-dominant states may alter the transformation rate and variant selection.
 
@@ -595,47 +445,30 @@ The Olson–Cohen model is one of the most physically meaningful models for stra
 
 ### 11.1 Shear-band density evolution
 
-The VUMAT uses a normalized shear-band density variable $N_{\text{sb}}$. Its increment is
+The VUMAT uses a normalized shear-band density variable `N_sb`. Its increment is
 
-$$
-\Delta N_{\text{sb}}
-=
-\alpha_{\text{OC}}
-(1 - N_{\text{sb}})
-\frac{\Delta \bar{\varepsilon}^{p}}{\varepsilon_{0,\text{OC}}}
-$$
+ΔN_sb = α_OC · (1 − N_sb) · Δε̄_p / ε0_OC
 
 where
 
-- $\alpha_{\text{OC}}$ controls the shear-band generation rate,
-- $\varepsilon_{0,\text{OC}}$ is a reference plastic strain,
-- $\Delta \bar{\varepsilon}^{p}$ is the equivalent plastic strain increment.
+- `α_OC` controls the shear-band generation rate,
+- `ε0_OC` is a reference plastic strain,
+- `Δε̄_p` is the equivalent plastic strain increment.
 
 The updated shear-band density is capped between 0 and 1:
 
-$$
-0 \leq N_{\text{sb}} \leq 1
-$$
+0 ≤ N_sb ≤ 1
 
 ### 11.2 Martensite fraction from Olson–Cohen nucleation
 
 The transformed fraction associated with shear-band nucleation is
 
-$$
-f_{M}^{\text{OC}}
-=
-1 -
-\exp
-\left[
--\beta_{\text{OC}}
-N_{\text{sb}}^{n_{\text{OC}}}
-\right]
-$$
+f_M_OC = 1 − exp( −β_OC · N_sb^n_OC )
 
 where
 
-- $\beta_{\text{OC}}$ controls nucleation efficiency,
-- $n_{\text{OC}}$ controls the shape of the transformation curve.
+- `β_OC` controls nucleation efficiency,
+- `n_OC` controls the shape of the transformation curve.
 
 ### 11.3 Advantages of the Olson–Cohen model
 
@@ -658,31 +491,20 @@ where
 
 The Johnson–Mehl–Avrami–Kolmogorov model is a classical nucleation-and-growth model. In strain-driven form, it may be written as
 
-$$
-f_{M}^{\text{JMAK}}
-=
-1 -
-\exp
-\left[
--K_{J}
-\left(
-\bar{\varepsilon}^{p}
-\right)^{n_{J}}
-\right]
-$$
+f_M_JMAK = 1 − exp( −K_J · (ε̄_p)^n_J )
 
 where
 
-- $K_{J}$ is a temperature-dependent rate constant,
-- $n_{J}$ is the Avrami exponent,
-- $\bar{\varepsilon}^{p}$ is the accumulated equivalent plastic strain.
+- `K_J` is a temperature-dependent rate constant,
+- `n_J` is the Avrami exponent,
+- `ε̄_p` is the accumulated equivalent plastic strain.
 
 ### 12.1 Advantages of JMAK
 
 - Captures sigmoidal transformation behavior.
 - Simple and robust.
 - Useful for fitting experimental transformation curves.
-- Can absorb temperature dependence through $K_J$.
+- Can absorb temperature dependence through `K_J`.
 
 ### 12.2 Limitations
 
@@ -695,32 +517,13 @@ where
 
 ## 13. Combined Olson–Cohen and JMAK Kinetics
 
-The VUMAT combines the two transformation descriptions as independent mechanisms. If two independent transformation mechanisms produce fractions $f_{M}^{\text{OC}}$ and $f_{M}^{\text{JMAK}}$, the combined fraction is
+The VUMAT combines the two transformation descriptions as independent mechanisms. If two independent transformation mechanisms produce fractions `f_M_OC` and `f_M_JMAK`, the combined fraction is
 
-$$
-f_{M}^{\text{base}}
-=
-1 -
-\left(
-1 - f_{M}^{\text{OC}}
-\right)
-\left(
-1 - f_{M}^{\text{JMAK}}
-\right)
-$$
+f_M_base = 1 − (1 − f_M_OC)·(1 − f_M_JMAK)
 
 This expression means that the untransformed austenite fraction is the product of the untransformed fractions from each mechanism:
 
-$$
-1 - f_{M}^{\text{base}}
-=
-\left(
-1 - f_{M}^{\text{OC}}
-\right)
-\left(
-1 - f_{M}^{\text{JMAK}}
-\right)
-$$
+1 − f_M_base = (1 − f_M_OC)·(1 − f_M_JMAK)
 
 ### 13.1 Why combine OC and JMAK?
 
@@ -738,25 +541,15 @@ The combined model allows the user to represent materials where transformation i
 
 Mechanical twins can act as additional nucleation sites for martensite. To represent this, the model adds a coupling term:
 
-$$
-f_{M}^{\text{base}}
-\leftarrow
-f_{M}^{\text{base}}
-+
-\alpha_{TM}
-\Delta f_{\text{tw}}
-\left(
-1 - f_{M}^{\text{base}}
-\right)
-$$
+f_M_base ← f_M_base + α_TM · Δf_tw · (1 − f_M_base)
 
 where
 
-- $\alpha_{TM}$ is the twin-to-martensite coupling coefficient,
-- $\Delta f_{\text{tw}}$ is the twin volume fraction increment,
-- $1 - f_{M}^{\text{base}}$ is the remaining transformable austenite.
+- `α_TM` is the twin-to-martensite coupling coefficient,
+- `Δf_tw` is the twin volume fraction increment,
+- `(1 − f_M_base)` is the remaining transformable austenite.
 
-If $\alpha_{TM}=0$, the coupling is disabled.
+If `alpha_TM = 0`, the coupling is disabled.
 
 ### 14.1 Physical meaning
 
@@ -771,9 +564,7 @@ This term captures the idea that twin boundaries can:
 
 Martensite transformation is treated as irreversible:
 
-$$
-f_{M}^{\text{new}} \geq f_{M}^{\text{old}}
-$$
+f_M_new ≥ f_M_old
 
 This prevents nonphysical reversal of martensite to austenite during unloading.
 
@@ -783,33 +574,17 @@ This prevents nonphysical reversal of martensite to austenite during unloading.
 
 Martensitic transformation in steels is accompanied by a volume expansion. The present model represents this using an isotropic volumetric eigenstrain.
 
-Let
+Let `ΔV/V` be the volumetric transformation strain associated with complete transformation. In the code this parameter is `dVoV`. Typical values for austenite-to-martensite transformation are approximately
 
-$$
-\Delta V/V
-$$
+0.02 ≤ ΔV/V ≤ 0.04
 
-be the volumetric transformation strain associated with complete transformation. In the code this parameter is `dVoV`. Typical values for austenite-to-martensite transformation are approximately
+For a martensite fraction increment `Δf_M`, the volumetric eigenstrain increment per spatial direction is
 
-$$
-0.02 \leq \Delta V/V \leq 0.04
-$$
-
-For a martensite fraction increment $\Delta f_M$, the volumetric eigenstrain increment per spatial direction is
-
-$$
-\Delta \varepsilon^{\text{tr}}_{ii}
-=
-\frac{\Delta f_M \Delta V/V}{3}
-$$
+Δε_tr_ii = Δf_M · (ΔV/V) / 3
 
 The corresponding stress correction for constrained expansion is
 
-$$
-\Delta \sigma_{ii}
-=
--K \Delta f_M \Delta V/V
-$$
+Δσ_ii = −K · Δf_M · (ΔV/V)
 
 for the three normal components.
 
@@ -819,7 +594,7 @@ for the three normal components.
 |---|---|---|---|
 | Unity model | No transformation strain | Simplest | Physically inadequate for TRIP steels |
 | Approximate isotropic volumetric model | Small-strain volumetric expansion | Simple | Less exact for finite strain |
-| Exact volumetric model | Uses transformation Jacobian $J^{\text{tr}}$ | Thermodynamically cleaner | Still isotropic |
+| Exact volumetric model | Uses transformation Jacobian `J_tr` | Thermodynamically cleaner | Still isotropic |
 | Directional shear model | Includes variant-specific shear | Captures variant selection | Requires variant data and calibration |
 | Combined volume-shear model | Includes dilatation and shear | Most complete | Complex, many parameters |
 | Statistical/microstructural model | Spatially heterogeneous transformation | Captures local effects | High computational cost |
@@ -850,9 +625,7 @@ Mechanical twinning is another important deformation mechanism in low-SFE FCC al
 
 The present model represents twinning using 12 FCC twin systems:
 
-$$
-\{111\}\langle 112 \rangle
-$$
+{111}⟨112⟩
 
 ---
 
@@ -860,31 +633,18 @@ $$
 
 ### 17.1 Twin Schmid tensors
 
-For each twin system $t$, a symmetric Schmid-like tensor is constructed:
+For each twin system `t`, a symmetric Schmid-like tensor is constructed:
 
-$$
-\mathbf{M}^{t}
-=
-\frac{1}{2}
-\left(
-\mathbf{s}^{t} \otimes \mathbf{n}^{t}
-+
-\mathbf{n}^{t} \otimes \mathbf{s}^{t}
-\right)
-$$
+M_t = 1/2 · ( s_t ⊗ n_t + n_t ⊗ s_t )
 
 where
 
-- $\mathbf{n}^{t}$ is the twin-plane normal,
-- $\mathbf{s}^{t}$ is the twin shear direction.
+- `n_t` is the twin-plane normal,
+- `s_t` is the twin shear direction.
 
 The resolved twin shear stress is
 
-$$
-\tau^{t}
-=
-\mathbf{M}^{t} : \boldsymbol{\sigma}
-$$
+τ_t = M_t : σ
 
 ### 17.2 Polar CRSS activation
 
@@ -892,15 +652,11 @@ Twinning is inherently directional. Unlike ordinary slip, which can often be tre
 
 The model therefore uses a **polar CRSS criterion**:
 
-$$
-\tau^{t} > \tau_{c}^{\text{tw}}
-$$
+τ_t > τ_c_tw
 
 and also requires
 
-$$
-\tau^{t} > 0
-$$
+τ_t > 0
 
 Thus a twin system activates only when the resolved shear stress is both positive and larger than the critical twin shear stress.
 
@@ -919,14 +675,14 @@ The selected model is the **polar CRSS criterion** because it is simple, robust,
 
 ### 17.4 Twin systems
 
-| Plane | Shear directions ($\pm \langle 112 \rangle/\sqrt{6}$) | Systems |
+| Plane | Shear directions (±⟨112⟩/√6) | Systems |
 |---|---|---|
-| $(1\ 1\ 1)$ | $[1\ 1\ \bar{2}]$, $[1\ \bar{2}\ 1]$, $[\bar{2}\ 1\ 1]$ | 1–3 |
-| $(1\ \bar{1}\ 1)$ | $[2\ 1\ \bar{1}]$, $[1\ 2\ 1]$, $[\bar{1}\ 1\ 2]$ | 4–6 |
-| $(\bar{1}\ 1\ 1)$ | $[1\ 2\ \bar{1}]$, $[2\ 1\ 1]$, $[1\ \bar{1}\ 2]$ | 7–9 |
-| $(1\ 1\ \bar{1})$ | $[1\ 1\ 2]$, $[2\ \bar{1}\ 1]$, $[\bar{1}\ 2\ 1]$ | 10–12 |
+| (1 1 1) | [1 1 -2], [1 -2 1], [-2 1 1] | 1–3 |
+| (1 -1 1) | [2 1 -1], [1 2 1], [-1 1 2] | 4–6 |
+| (-1 1 1) | [1 2 -1], [2 1 1], [1 -1 2] | 7–9 |
+| (1 1 -1) | [1 1 2], [2 -1 1], [-1 2 1] | 10–12 |
 
-$\mathbf{n}\cdot\mathbf{s}=0$ holds for every pair; the sign of $\mathbf{s}$ sets the twinning sense (verify against your crystallography).
+`n·s = 0` holds for every pair; the sign of `s` sets the twinning sense (verify against your crystallography).
 
 ---
 
@@ -936,46 +692,20 @@ $\mathbf{n}\cdot\mathbf{s}=0$ holds for every pair; the sign of $\mathbf{s}$ set
 
 The model uses a smooth hyperbolic tangent law to determine the target twin volume fraction:
 
-$$
-f_{\text{tw}}^{\text{target}}
-=
-A_{\text{tw}}
-\frac{1}{2}
-\left[
-1 +
-\tanh
-\left(
-\frac{
-\tau_{\max}^{t}
--
-\tau_{c}^{\text{tw}}
-}{
-B_{\text{tw}}
-}
-\right)
-\right]
-$$
+f_tw_target = A_tw · (1/2) · [ 1 + tanh( (τ_max_t − τ_c_tw) / B_tw ) ]
 
 where
 
-- $A_{\text{tw}}$ is the maximum twin volume fraction,
-- $B_{\text{tw}}$ controls the transition width,
-- $\tau_{\max}^{t}$ is the maximum resolved twin shear stress among all twin systems,
-- $\tau_{c}^{\text{tw}}$ is the critical twin shear stress.
+- `A_tw` is the maximum twin volume fraction,
+- `B_tw` controls the transition width,
+- `τ_max_t` is the maximum resolved twin shear stress among all twin systems,
+- `τ_c_tw` is the critical twin shear stress.
 
 ### 18.2 Irreversibility
 
 Twin growth is treated as irreversible:
 
-$$
-\Delta f_{\text{tw}}
-=
-\max
-\left(
-0,
-f_{\text{tw}}^{\text{target}} - f_{\text{tw}}^{\text{old}}
-\right)
-$$
+Δf_tw = max( 0, f_tw_target − f_tw_old )
 
 This prevents detwinning during unloading in the current implementation.
 
@@ -983,15 +713,11 @@ This prevents detwinning during unloading in the current implementation.
 
 The twin fraction increment is limited by a maximum value per increment:
 
-$$
-\Delta f_{\text{tw}} \leq \Delta f_{\text{tw}}^{\max}
-$$
+Δf_tw ≤ Δf_tw_max
 
 In the current code, the default cap is
 
-$$
-\Delta f_{\text{tw}}^{\max} = 0.02
-$$
+Δf_tw_max = 0.02
 
 This improves explicit stability and prevents abrupt strain spikes.
 
@@ -1001,39 +727,20 @@ The twin plastic strain increment is distributed over active twin systems accord
 
 Define the active-system weight:
 
-$$
-w^{t}
-=
-\max
-\left(
-0,
-\tau^{t} - \tau_{c}^{\text{tw}}
-\right)
-$$
+w_t = max( 0, τ_t − τ_c_tw )
 
 The total weight is
 
-$$
-W =
-\sum_{t} w^{t}
-$$
+W = Σ_t w_t
 
-If $W > 0$, the twin plastic strain increment is
+If `W > 0`, the twin plastic strain increment is
 
-$$
-\Delta \boldsymbol{\varepsilon}^{\text{tw}}
-=
-\sum_{t}
-\frac{w^{t}}{W}
-\Delta f_{\text{tw}}^{\text{eff}}
-\gamma_{\text{tw}}
-\mathbf{M}^{t}
-$$
+Δε_tw = Σ_t  (w_t / W) · Δf_tw_eff · γ_tw · M_t
 
 where
 
-- $\gamma_{\text{tw}}$ is the characteristic twin shear,
-- for FCC twinning, $\gamma_{\text{tw}} \approx 0.707$.
+- `γ_tw` is the characteristic twin shear,
+- for FCC twinning, `γ_tw ≈ 0.707`.
 
 ### 18.5 Twinning kinetics alternatives
 
@@ -1064,9 +771,7 @@ This is particularly important in Abaqus/Explicit, where sudden internal strain 
 
 Because both martensite and twins consume austenite, the model enforces
 
-$$
-f_M + f_{\text{tw}} \leq 1
-$$
+f_M + f_tw ≤ 1
 
 The implementation proceeds as follows:
 
@@ -1102,76 +807,33 @@ If `totalTime = 0`, state variables are initialized:
 
 A trial stress is computed:
 
-$$
-\boldsymbol{\sigma}^{\text{trial}}
-=
-\boldsymbol{\sigma}^{\text{old}}
-+
-\mathbf{D}^{e} : \Delta \boldsymbol{\varepsilon}
-$$
+σ_trial = σ_old + D_e : Δε
 
 ### Step 2: Slip-system resolved shear stresses
 
 For each of the 12 slip systems:
 
-$$
-\tau^{\alpha}
-=
-\mathbf{M}^{\alpha} : \boldsymbol{\sigma}^{\text{trial}}
-$$
+τ_α = M_α : σ_trial
 
 ### Step 3: Rate-dependent slip increments
 
-$$
-\Delta \gamma^{\alpha}
-=
-\dot{\gamma}_{0}
-\left|
-\frac{\tau^{\alpha}}{g^{\alpha}}
-\right|^{1/m}
-\operatorname{sign}(\tau^{\alpha})
-\Delta t
-$$
+Δγ_α = γ̇_0 · ( |τ_α| / g_α )^(1/m) · sign(τ_α) · Δt
 
 The slip increments are capped for stability.
 
 ### Step 4: Assemble slip plastic strain
 
-$$
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-=
-\sum_{\alpha=1}^{12}
-\mathbf{M}^{\alpha}
-\Delta \gamma^{\alpha}
-$$
+Δε_cp = Σ_α=1..12  M_α · Δγ_α
 
 ### Step 5: Anti-overshoot limiter
 
 The deviatoric part of the slip strain increment is compared with the deviatoric part of the imposed strain increment. If the slip strain increment is larger, it is scaled back:
 
-$$
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-\leftarrow
-s
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-$$
+Δε_cp ← s · Δε_cp
 
 with
 
-$$
-s =
-\frac{
-\left\|
-\operatorname{dev}
-\Delta \boldsymbol{\varepsilon}
-\right\|
-}{
-\left\|
-\operatorname{dev}
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-\right\|
-}
-$$
+s = ‖ dev(Δε) ‖ / ‖ dev(Δε_cp) ‖
 
 This prevents explicit instability caused by excessive plastic correction in a single increment.
 
@@ -1179,47 +841,19 @@ This prevents explicit instability caused by excessive plastic correction in a s
 
 For each slip system:
 
-$$
-\Gamma^{\alpha}_{\text{new}}
-=
-\Gamma^{\alpha}_{\text{old}}
-+
-|\Delta \gamma^{\alpha}|
-$$
+Γ_α_new = Γ_α_old + |Δγ_α|
 
-Then $g^{\alpha}$ is updated using the Voce law.
+Then `g_α` is updated using the Voce law.
 
 ### Step 7: Twinning resolved shear stresses
 
 For each twin system:
 
-$$
-\tau^{t}
-=
-\mathbf{M}^{t} : \boldsymbol{\sigma}^{\text{trial}}
-$$
+τ_t = M_t : σ_trial
 
 ### Step 8: TANH twin target fraction
 
-$$
-f_{\text{tw}}^{\text{target}}
-=
-A_{\text{tw}}
-\frac{1}{2}
-\left[
-1 +
-\tanh
-\left(
-\frac{
-\tau_{\max}^{t}
--
-\tau_{c}^{\text{tw}}
-}{
-B_{\text{tw}}
-}
-\right)
-\right]
-$$
+f_tw_target = A_tw · (1/2) · [ 1 + tanh( (τ_max_t − τ_c_tw) / B_tw ) ]
 
 ### Step 9: Twin fraction update
 
@@ -1229,98 +863,31 @@ The twin fraction increment is made irreversible and capped.
 
 The equivalent plastic strain increment is computed from the slip strain increment:
 
-$$
-\Delta \bar{\varepsilon}^{p}
-=
-\sqrt{
-\frac{2}{3}
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-:
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-}
-$$
+Δε̄_p = sqrt( (2/3) · Δε_cp : Δε_cp )
 
 Then the Olson–Cohen shear-band density is updated:
 
-$$
-N_{\text{sb,new}}
-=
-N_{\text{sb,old}}
-+
-\alpha_{\text{OC}}
-(1 - N_{\text{sb,old}})
-\frac{
-\Delta \bar{\varepsilon}^{p}
-}{
-\varepsilon_{0,\text{OC}}
-}
-$$
+N_sb_new = N_sb_old + α_OC · (1 − N_sb_old) · Δε̄_p / ε0_OC
 
 The Olson–Cohen martensite fraction is
 
-$$
-f_{M}^{\text{OC}}
-=
-1 -
-\exp
-\left[
--\beta_{\text{OC}}
-N_{\text{sb,new}}^{n_{\text{OC}}}
-\right]
-$$
+f_M_OC = 1 − exp( −β_OC · N_sb_new^n_OC )
 
 The JMAK fraction is
 
-$$
-f_{M}^{\text{JMAK}}
-=
-1 -
-\exp
-\left[
--K_{J}
-\left(
-\bar{\varepsilon}^{p}_{\text{new}}
-\right)^{n_{J}}
-\right]
-$$
+f_M_JMAK = 1 − exp( −K_J · (ε̄_p_new)^n_J )
 
 The combined base fraction is
 
-$$
-f_{M}^{\text{base}}
-=
-1 -
-\left(
-1 - f_{M}^{\text{OC}}
-\right)
-\left(
-1 - f_{M}^{\text{JMAK}}
-\right)
-$$
+f_M_base = 1 − (1 − f_M_OC)·(1 − f_M_JMAK)
 
 Twin coupling is then added:
 
-$$
-f_{M}^{\text{base}}
-\leftarrow
-f_{M}^{\text{base}}
-+
-\alpha_{TM}
-\Delta f_{\text{tw}}
-\left(
-1 - f_{M}^{\text{base}}
-\right)
-$$
+f_M_base ← f_M_base + α_TM · Δf_tw · (1 − f_M_base)
 
 The martensite fraction is enforced to be monotonic and bounded:
 
-$$
-f_{M}^{\text{old}}
-\leq
-f_{M}^{\text{new}}
-\leq
-1
-$$
+f_M_old ≤ f_M_new ≤ 1
 
 The increment is also capped for explicit stability.
 
@@ -1328,51 +895,25 @@ The increment is also capped for explicit stability.
 
 The twin fraction is reduced if necessary to satisfy
 
-$$
-f_{M}^{\text{new}} + f_{\text{tw}}^{\text{new}} \leq 1
-$$
+f_M_new + f_tw_new ≤ 1
 
 ### Step 12: Assemble total inelastic strain
 
-$$
-\Delta \boldsymbol{\varepsilon}^{\text{inel}}
-=
-\Delta \boldsymbol{\varepsilon}^{\text{cp}}
-+
-\Delta \boldsymbol{\varepsilon}^{\text{tw}}
-$$
+Δε_inel = Δε_cp + Δε_tw
 
 ### Step 13: Stress update
 
 The elastic strain increment is
 
-$$
-\Delta \boldsymbol{\varepsilon}^{e}
-=
-\Delta \boldsymbol{\varepsilon}
--
-\Delta \boldsymbol{\varepsilon}^{\text{inel}}
-$$
+Δε_e = Δε − Δε_inel
 
 The stress increment is
 
-$$
-\Delta \boldsymbol{\sigma}
-=
-\mathbf{D}^{e}
-:
-\Delta \boldsymbol{\varepsilon}^{e}
-$$
+Δσ = D_e : Δε_e
 
 Then the martensite volumetric eigenstrain correction is applied:
 
-$$
-\Delta \sigma_{ii}
-\leftarrow
-\Delta \sigma_{ii}
--
-K \Delta f_M \Delta V/V
-$$
+Δσ_ii ← Δσ_ii − K · Δf_M · (ΔV/V)
 
 ### Step 14: State variable update
 
@@ -1402,7 +943,7 @@ The subroutine expects:
 | 12 | `K_J` | JMAK rate constant | — |
 | 13 | `n_J` | JMAK/Avrami exponent | — |
 | 14 | `T_ref` | Reference temperature | K |
-| 15 | `dVoV` | Volumetric transformation strain $\Delta V/V$ | — |
+| 15 | `dVoV` | Volumetric transformation strain `ΔV/V` | — |
 | 16 | `tau_twin` | Critical resolved shear stress for twinning | stress unit |
 | 17 | `gam_twin` | Characteristic twin shear | — |
 | 18 | `A_tw` | Maximum twin volume fraction | — |
@@ -1421,10 +962,10 @@ The subroutine requires:
 |---:|---:|---|
 | 1–12 | `sv(1:12)` | Accumulated slip shear strain on slip systems 1–12 |
 | 13–24 | `sv(13:24)` | Current CRSS on slip systems 1–12 |
-| 25 | `sv(25)` | Martensite volume fraction $f_M$ |
-| 26 | `sv(26)` | Twin volume fraction $f_{\text{tw}}$ |
+| 25 | `sv(25)` | Martensite volume fraction `f_M` |
+| 26 | `sv(26)` | Twin volume fraction `f_tw` |
 | 27 | `sv(27)` | Equivalent plastic strain from slip |
-| 28 | `sv(28)` | Normalized shear-band density $N_{\text{sb}}$ |
+| 28 | `sv(28)` | Normalized shear-band density `N_sb` |
 | 29 | `sv(29)` | Accumulated transformation strain |
 | 30 | `sv(30)` | Temperature |
 
@@ -1519,13 +1060,7 @@ Explicit simulations can become unstable if internal variables evolve too rapidl
 
 The power-law term is capped:
 
-$$
-\left|
-\frac{\tau}{g}
-\right|^{1/m}
-\leq
-10^{8}
-$$
+( |τ| / g )^(1/m) ≤ 1e8
 
 This prevents overflow for very high stress ratios.
 
@@ -1533,9 +1068,7 @@ This prevents overflow for very high stress ratios.
 
 Each slip increment is limited:
 
-$$
-|\Delta \gamma^{\alpha}| \leq 0.01
-$$
+|Δγ_α| ≤ 0.01
 
 This prevents excessively large slip in one increment.
 
@@ -1545,15 +1078,11 @@ The total deviatoric slip strain increment cannot exceed the imposed deviatoric 
 
 ### 26.4 Twin fraction rate cap
 
-$$
-\Delta f_{\text{tw}} \leq 0.02
-$$
+Δf_tw ≤ 0.02
 
 ### 26.5 Martensite fraction rate cap
 
-$$
-\Delta f_{M} \leq 0.02
-$$
+Δf_M ≤ 0.02
 
 ### 26.6 Argument clamping
 
@@ -1656,7 +1185,7 @@ The constitutive update is not a fully implicit return-mapping algorithm. It is 
 
 ## 29. Comparison with Macroscopic Constitutive Models
 
-| Feature | Macroscopic $J_2$/Hill/Barlat model | Present crystal plasticity TRIP model |
+| Feature | Macroscopic `J2`/Hill/Barlat model | Present crystal plasticity TRIP model |
 |---|---|---|
 | Crystallographic slip | No | Yes |
 | Texture sensitivity | Limited or empirical | Yes |
@@ -1677,18 +1206,13 @@ The constitutive update is not a fully implicit return-mapping algorithm. It is 
 
 Obtain from literature or experiments:
 
-- $E$,
-- $\nu$.
+- `E`,
+- `ν`.
 
 For steel, typical values are approximately:
 
-$$
-E \approx 190\text{--}210 \ \text{GPa}
-$$
-
-$$
-\nu \approx 0.28\text{--}0.30
-$$
+E ≈ 190–210 GPa
+ν ≈ 0.28–0.30
 
 Use consistent Abaqus units.
 
@@ -1703,13 +1227,9 @@ Calibrate using single-crystal or polycrystalline stress–strain data:
 
 For a rough initial estimate:
 
-$$
-\sigma_{\text{yield}}
-\approx
-\frac{\tau_0}{M_{\text{Schmid,max}}}
-$$
+σ_yield ≈ τ0 / M_Schmid,max
 
-where $M_{\text{Schmid,max}}$ is the maximum Schmid factor for the loading direction.
+where `M_Schmid,max` is the maximum Schmid factor for the loading direction.
 
 ### 30.3 Transformation parameters
 
@@ -1732,9 +1252,7 @@ Use crystallographic data or dilatometry.
 
 Typical values:
 
-$$
-\Delta V/V \approx 0.02\text{--}0.04
-$$
+ΔV/V ≈ 0.02–0.04
 
 ### 30.5 Twinning parameters
 
@@ -1777,7 +1295,7 @@ Assign random or measured orientations and examine:
 
 ### 31.4 Phase fraction evolution
 
-Compare predicted $f_M$ versus strain against:
+Compare predicted `f_M` versus strain against:
 
 - XRD,
 - EBSD,
@@ -1786,7 +1304,7 @@ Compare predicted $f_M$ versus strain against:
 
 ### 31.5 Twin fraction evolution
 
-Compare predicted $f_{\text{tw}}$ against:
+Compare predicted `f_tw` against:
 
 - EBSD twin boundary analysis,
 - TEM observations,
@@ -1806,13 +1324,7 @@ The model can be extended in several directions.
 
 Introduce a hardening matrix:
 
-$$
-\dot{g}^{\alpha}
-=
-\sum_{\beta}
-h^{\alpha\beta}
-|\dot{\gamma}^{\beta}|
-$$
+ġ_α = Σ_β  h_αβ · |γ̇_β|
 
 This improves multislip and texture predictions.
 
@@ -1820,47 +1332,31 @@ This improves multislip and texture predictions.
 
 Replace isotropic Hooke elasticity with cubic elasticity using:
 
-$$
-C_{11}, C_{12}, C_{44}
-$$
+C11, C12, C44
 
 ### 32.3 Full finite-strain hyperelastic formulation
 
 Implement a multiplicative decomposition with an explicit update of:
 
-$$
-\mathbf{F}^{e}, \mathbf{F}^{p}, \mathbf{F}^{\text{tr}}, \mathbf{F}^{\text{tw}}
-$$
+F_e, F_p, F_tr, F_tw
 
 ### 32.4 Stress-state-dependent transformation kinetics
 
 Introduce triaxiality and Lode angle dependence:
 
-$$
-K_J = K_J(\eta, \bar{\theta})
-$$
+K_J = K_J(η, θ̄)
 
 or
 
-$$
-\alpha_{\text{OC}} =
-\alpha_{\text{OC}}(\eta, \bar{\theta})
-$$
+α_OC = α_OC(η, θ̄)
 
 ### 32.5 Thermomechanical coupling
 
 Update temperature from plastic work:
 
-$$
-\Delta T
-=
-\frac{\beta_{\text{Taylor}}}
-{\rho c_p}
-\boldsymbol{\sigma} :
-\Delta \boldsymbol{\varepsilon}^{p}
-$$
+ΔT = ( β_Taylor / (ρ·c_p) ) · σ : Δε_p
 
-where $\beta_{\text{Taylor}}$ is the Taylor–Quinney coefficient.
+where `β_Taylor` is the Taylor–Quinney coefficient.
 
 ### 32.6 Two-phase crystal plasticity
 
@@ -1875,13 +1371,7 @@ Represent martensite as a separate phase with its own slip systems:
 
 Introduce martensite variants and transformation shear tensors:
 
-$$
-\boldsymbol{\varepsilon}^{\text{tr}}
-=
-\sum_{v}
-f^{v}
-\boldsymbol{\varepsilon}^{\text{tr},v}
-$$
+ε_tr = Σ_v  f_v · ε_tr,v
 
 ### 32.8 Twin reorientation
 
@@ -1925,7 +1415,7 @@ Couple the model with continuum damage mechanics to predict ductile fracture aft
    Explicit simulations are sensitive to rapid internal variable changes.
 
 4. **Monitor phase fractions.**  
-   Ensure $f_M$ and $f_{\text{tw}}$ remain physically reasonable.
+   Ensure `f_M` and `f_tw` remain physically reasonable.
 
 5. **Check orientation assignment.**  
    Incorrect orientations can produce unrealistic texture and yield behavior.
